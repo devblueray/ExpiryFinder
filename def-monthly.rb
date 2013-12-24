@@ -2,6 +2,7 @@ require 'whois'
 require 'trollop'
 require 'httpclient'
 require 'net/smtp'
+require 'domainatrix'
 
 def mailer(domMsg,certMsg,domain,user,pass,*arrDst)
   smtp = Net::SMTP.new 'smtp.gmail.com', 587
@@ -28,12 +29,14 @@ end
 domMsg=[]
 certMsg=[]
 
+
 opts[:sites].each do |d|
   begin
-    if Whois::whois(d).expires_on - Time.now > opts[:time] *24*60*60
-      domMsg << "#{d} is ok"
+    url = Domainatrix.parse(d)
+    if Whois::whois(url.domain_with_public_suffix).expires_on - Time.now > opts[:time] *24*60*60
+      domMsg << "#{url} is ok"
     else
-      domMsg << "#{d} IS EXPIRING IN LESS THAN #{opts[:time]} days\n"
+      domMsg << "#{url.domain_with_public_suffix} IS EXPIRING IN LESS THAN #{opts[:time]} days\n"
     end
 
     if HTTPClient.new.get("https://#{d}").peer_cert.not_after - Time.now > opts[:time]*24*60*60
@@ -45,10 +48,6 @@ opts[:sites].each do |d|
 
   end
 end
-
-
-
-
 
 mailer(domMsg,certMsg,opts[:domain],opts[:user],opts[:pass],opts[:dest]) unless [domMsg,certMsg].all? {|m| m.empty?}
 
