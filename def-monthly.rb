@@ -7,31 +7,63 @@ require 'domainatrix'
 class DomainChecker
 
   def whois(time,sites)
+    cnt = 0
     domMsg=[]
-    sites.each do |s|
-      url = Domainatrix.parse(s)
-        if Whois::whois(url.domain_with_public_suffix).expires_on - Time.now > time*24*60*60
-        domMsg << "#{url.domain_with_tld} is ok"
-      else
-        domMsg << "#{url.domain_with_public_suffix} IS EXPIRING IN LESS THAN #{time} days\n"
+    siteList=[]
+    if sites.count == 1 && File.exists?(sites.first)
+      File.open(sites.first,"r") do |file|
+        while line = file.gets
+        siteList << line.chomp
+
+
+        end
+       end
+    else
+      siteList = sites
+    end
+
+    siteList.each do |s|
+
+      r = Whois::whois(s)
+      puts r.expires_on
+
+    p "#{s}: #{r.expires_on}"
+    if r.expires_on - Time.now > time*24*60*60
+        domMsg << "#{s} is ok (Whois reports: #{r.expires_on})\n"
+    else
+        cnt += 1
+        p cnt
+        domMsg << "#{s} IS EXPIRING IN LESS THAN #{time} days (Whois reports: #{r.expires_on})\n"
       end
     end
-    return domMsg
+
+    return cnt,domMsg
   end
+
+
 
   def certCheck(time,sites)
+    cnt = 0
     certMsg=[]
     sites.each do |s|
-     if HTTPClient.new.get("https://#{s}").peer_cert.not_after - Time.now > time*24*60*60
-        certMsg << "#{s} certificate is ok"
-      else
-        certMsg << "#{s} CERTIFICATE EXPIRING EXPIRING IN LESS THAN #{time} days\n"
+     expiry = HTTPClient.new.get("https://#{s}").peer_cert.not_after
+     if expiry - Time.now > time*24*60*60
+        certMsg << "#{s} certificate is ok (Certificate reports #{expiry})\n"
+     else
+       cnt += 1
+        certMsg << "#{s} CERTIFICATE EXPIRING EXPIRING IN LESS THAN #{time} days (Certificate reports #{expiry})\n"
       end
+
+
     end
-    return certMsg
+
+
+
+
+    return cnt,certMsg
   end
 
-  def mailer(domMsg,certMsg,arrDst)
+  def mailer(domCount,domMsg,certCount,certMsg,arrDst)
     recpients = arrDst.join(",")
     domains = domMsg.join("\r")
     certs = certMsg.join("\r")
@@ -39,7 +71,7 @@ class DomainChecker
     msgstr = <<EOM
 From: Prodege Domain Alerts <domalerts@prodege.com>
 To: #{recpients}
-Subject: Domains and/or Certificates Expiring Soon
+Subject: #{domCount} Domains and #{certCount} Certificates Expiring Soon
 
 DOMAINS
 #{domains}
@@ -50,7 +82,7 @@ EOM
     smtp.send_message msgstr,'domalerts@prodege.com',arrDst
     smtp.finish
     end
-  end
+end
 
 opts = Trollop::options do
   opt :sites, 'Enter domain to test', :type=> :string, :short=>'d', :multi=>true
@@ -62,6 +94,5 @@ end
 app = DomainChecker.new
 s = app.whois(opts[:time],opts[:sites])
 t = app.certCheck(opts[:time],opts[:cert])
-
-m = app.mailer(s,t,opts[:dest]) unless [s,t].all? {|m| m.empty?}
+m = app.mailer(s[0],s[1],t[0],t[1],opts[:dest])
 
