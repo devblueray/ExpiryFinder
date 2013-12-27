@@ -48,9 +48,10 @@ class DomainChecker
     To: #{recpients}
     Subject: Domains and/or Certificates Expiring Soon
 
-    \nDOMAINS\n
+    DOMAINS
     #{domains}
-    \nCERTIFICATES\n
+
+    CERTIFICATES
     #{certs}
 EOM
     smtp.send_message msgstr,'domalerts@prodege.com',arrDst
