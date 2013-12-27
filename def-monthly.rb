@@ -4,55 +4,72 @@ require 'httpclient'
 require 'net/smtp'
 require 'domainatrix'
 
-def whois(*sites)
-  url = Domainatrix.parse(d)
-  if Whois::whois(url.domain_with_public_suffix).expires_on - Time.now > opts[:time] *24*60*60
-    domMsg << "#{url} is ok"
-  else
-    domMsg << "#{url.domain_with_public_suffix} IS EXPIRING IN LESS THAN #{opts[:time]} days\n"
+
+
+
+
+
+class DomainChecker
+
+
+
+  def whois(time,sites)
+    domMsg=[]
+    sites.each do |s|
+      url = Domainatrix.parse(s)
+        if Whois::whois(url.domain_with_public_suffix).expires_on - Time.now > time*24*60*60
+        domMsg << "#{url.domain_with_tld} is ok"
+      else
+        domMsg << "#{url.domain_with_public_suffix} IS EXPIRING IN LESS THAN #{time} days\n"
+      end
+    end
+    return domMsg
   end
-end
-def mailer(domMsg,certMsg,domain,user,pass,*arrDst)
-  smtp = Net::SMTP.new 'smtp.gmail.com', 587
-  smtp.enable_starttls
-  smtp.start(domain,user,pass, :login) do |smtp|
-    smtp.open_message_stream(user,arrDst) do |f|
-      f.puts 'Subject: Domains and/or Certificates Expiring soon'
-      f.puts "DOMAINS\n\n"
-      domMsg.each {|d| f.puts d}
-      f.puts "\n\nCERTIFICATES\n\n"
-      certMsg.each {|c| f.puts c}
+
+  def certCheck(time,sites)
+    certMsg=[]
+    sites.each do |s|
+     if HTTPClient.new.get("https://#{s}").peer_cert.not_after - Time.now > time*24*60*60
+        certMsg << "#{s} certificate is ok"
+      else
+        certMsg << "#{s} CERTIFICATE EXPIRING EXPIRING IN LESS THAN #{time} days\n"
+      end
+    end
+    return certMsg
+  end
+
+  def mailer(domMsg,certMsg,arrDst)
+    recpients = arrDst.join(",")
+    domains = domMsg.join("\n")
+    certs = certMsg.join("\n")
+    smtp = Net::SMTP.start('localhost',25)
+    msgstr = <<EOM
+    From: Prodege Domain Alerts <domalerts@prodege.com>
+    To: #{recpients}
+    Subject: Domains and/or Certificates Expiring Soon
+
+    \nDOMAINS\n
+    #{domains}
+    \nCERTIFICATES\n
+    #{certs}
+EOM
+    smtp.send_message msgstr,'domalerts@prodege.com',arrDst
+    smtp.finish
     end
   end
-end
 
 opts = Trollop::options do
-  opt :sites, 'Enter domain to test', :type=> :string, :short=>'-s', :multi=>true
+  opt :sites, 'Enter domain to test', :type=> :string, :short=>'d', :multi=>true
   opt :time, 'Enter time till warn in days', :type=> :integer, :short => '-t', :default=> 60
-  opt :domain, 'Enter gapps domain', :type => :string, :short=> '-d'
-  opt :user, 'enter gmail username', :type=> :string, :short => '-u'
-  opt :pass, 'enter gmail password', :type=> :string, :short => '-p'
   opt :dest, 'Enter recipients', :type => :string, :multi => true, :short=> '-r'
-end
-domMsg=[]
-certMsg=[]
-
-
-opts[:sites].each do |d|
-  begin
-
-
-    if HTTPClient.new.get("https://#{d}").peer_cert.not_after - Time.now > opts[:time]*24*60*60
-      certMsg << "#{d} is ok"
-    else
-      certMsg << "#{d} CERTIFICATE EXPIRING EXPIRING IN LESS THAN #{opts[:time]} days\n"
-    end
-  rescue Errno::ETIMEDOUT
-
-  end
+  opt :cert, 'Enter domain or cert file to test', :type=> :string, :multi => true, :short=> '-s'
 end
 
-mailer(domMsg,certMsg,opts[:domain],opts[:user],opts[:pass],opts[:dest]) unless [domMsg,certMsg].all? {|m| m.empty?}
+app = DomainChecker.new
+s = app.whois(opts[:time],opts[:sites])
+t = app.certCheck(opts[:time],opts[:cert])
+
+m = app.mailer(s,t,opts[:dest]) unless [s,t].all? {|m| m.empty?}
 
 
 
