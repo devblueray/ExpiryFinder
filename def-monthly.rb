@@ -33,8 +33,8 @@ class DomainChecker
 
   def mailer(domMsg,certMsg,arrDst)
     recpients = arrDst.join(",")
-    domains = domMsg.join("\n")
-    certs = certMsg.join("\n")
+    domains = domMsg.join("\r")
+    certs = certMsg.join("\r")
     smtp = Net::SMTP.start('localhost',25)
     msgstr = <<EOM
 From: Prodege Domain Alerts <domalerts@prodege.com>
