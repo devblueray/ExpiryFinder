@@ -4,14 +4,7 @@ require 'httpclient'
 require 'net/smtp'
 require 'domainatrix'
 
-
-
-
-
-
 class DomainChecker
-
-
 
   def whois(time,sites)
     domMsg=[]
@@ -44,15 +37,15 @@ class DomainChecker
     certs = certMsg.join("\n")
     smtp = Net::SMTP.start('localhost',25)
     msgstr = <<EOM
-    From: Prodege Domain Alerts <domalerts@prodege.com>
-    To: #{recpients}
-    Subject: Domains and/or Certificates Expiring Soon
+From: Prodege Domain Alerts <domalerts@prodege.com>
+To: #{recpients}
+Subject: Domains and/or Certificates Expiring Soon
 
-    DOMAINS
-    #{domains}
+DOMAINS
+#{domains}
 
-    CERTIFICATES
-    #{certs}
+CERTIFICATES
+#{certs}
 EOM
     smtp.send_message msgstr,'domalerts@prodege.com',arrDst
     smtp.finish
@@ -71,9 +64,4 @@ s = app.whois(opts[:time],opts[:sites])
 t = app.certCheck(opts[:time],opts[:cert])
 
 m = app.mailer(s,t,opts[:dest]) unless [s,t].all? {|m| m.empty?}
-
-
-
-
-
 
