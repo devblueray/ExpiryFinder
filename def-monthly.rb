@@ -14,8 +14,6 @@ class DomainChecker
       File.open(sites.first,"r") do |file|
         while line = file.gets
         siteList << line.chomp
-
-
         end
        end
     else
@@ -23,8 +21,13 @@ class DomainChecker
     end
 
     siteList.each do |s|
-
+    begin
       r = Whois::whois(s)
+    rescue Errno::ETIMEDOUT
+      next
+    rescue Errno::ECONNRESET
+      next
+    end
       puts r.expires_on
 
     p "#{s}: #{r.expires_on}"
@@ -36,16 +39,20 @@ class DomainChecker
         domMsg << "#{s} IS EXPIRING IN LESS THAN #{time} days (Whois reports: #{r.expires_on})\n"
       end
     end
-
     return cnt,domMsg
   end
-
-
 
   def certCheck(time,sites)
     cnt = 0
     certMsg=[]
     sites.each do |s|
+      begin
+        expiry = HTTPClient.new.get("https://#{s}").peer_cert.not_after
+      rescue Errno::ETIMEDOUT
+        next
+      rescue Errno::ECONNRESET
+        next
+      end
      expiry = HTTPClient.new.get("https://#{s}").peer_cert.not_after
      if expiry - Time.now > time*24*60*60
         certMsg << "#{s} certificate is ok (Certificate reports #{expiry})\n"
@@ -56,10 +63,6 @@ class DomainChecker
 
 
     end
-
-
-
-
     return cnt,certMsg
   end
 
