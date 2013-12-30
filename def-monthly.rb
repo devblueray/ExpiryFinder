@@ -3,9 +3,10 @@ require 'trollop'
 require 'httpclient'
 require 'net/smtp'
 require 'domainatrix'
+require 'action_view'
 
 class DomainChecker
-
+include ActionView::Helpers::TextHelper
   def whois(time,sites)
     cnt = 0
     domMsg=[]
@@ -67,14 +68,15 @@ class DomainChecker
   end
 
   def mailer(domCount,domMsg,certCount,certMsg,arrDst)
-    recpients = arrDst.join(",")
-    domains = domMsg.join("\r")
-    certs = certMsg.join("\r")
+    recipients = arrDst.join(",")
+    domains = domMsg.join("\n")
+    certs = certMsg.join("\n")
     smtp = Net::SMTP.start('localhost',25)
+
     msgstr = <<EOM
 From: Prodege Domain Alerts <domalerts@prodege.com>
-To: #{recpients}
-Subject: #{domCount} Domains and #{certCount} Certificates Expiring Soon
+To: #{recipients}
+Subject: #{pluralize(domCount,'Domain')} and #{pluralize(certCount, 'Certificate')} Expiring Soon
 
 DOMAINS
 #{domains}
