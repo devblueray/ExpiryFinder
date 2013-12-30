@@ -7,6 +7,7 @@ require 'action_view'
 
 class DomainChecker
 include ActionView::Helpers::TextHelper
+
   def whois(time,sites)
     cnt = 0
     domMsg=[]
@@ -28,6 +29,8 @@ include ActionView::Helpers::TextHelper
       next
     rescue Errno::ECONNRESET
       next
+    rescue Errno::ECONNREFUSED
+      next
     end
       puts r.expires_on
 
@@ -46,13 +49,26 @@ include ActionView::Helpers::TextHelper
   def certCheck(time,sites)
     cnt = 0
     certMsg=[]
-    sites.each do |s|
+    siteList=[]
+    if sites.count == 1 && File.exists?(sites.first)
+      File.open(sites.first,"r") do |file|
+        while line = file.gets
+          siteList << line.chomp
+        end
+      end
+    else
+      siteList = sites
+    end
+    siteList.each do |s|
       begin
         expiry = HTTPClient.new.get("https://#{s}").peer_cert.not_after
       rescue Errno::ETIMEDOUT
         next
       rescue Errno::ECONNRESET
         next
+      rescue Errno::ECONNREFUSED
+        next
+
       end
      expiry = HTTPClient.new.get("https://#{s}").peer_cert.not_after
      if expiry - Time.now > time*24*60*60
